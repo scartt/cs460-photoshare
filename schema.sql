@@ -181,7 +181,3 @@ CREATE TABLE Liked_pictures
 	FOREIGN KEY (picture_id) REFERENCES Pictures(picture_id)
 );
 
-
-
-INSERT INTO Users (email, password) VALUES ('test@bu.edu', 'test');
-INSERT INTO Users (email, password) VALUES ('test1@bu.edu', 'test');

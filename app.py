@@ -14,8 +14,6 @@ from flask import Flask, Response, request, render_template, redirect, url_for
 from flaskext.mysql import MySQL
 import flask_login
 
-from collections import Counter
-
 #for image uploading
 import os, base64
 
@@ -25,7 +23,7 @@ app.secret_key = 'super secret string'  # Change this!
 
 #These will need to be changed according to your creditionals
 app.config['MYSQL_DATABASE_USER'] = 'root'
-app.config['MYSQL_DATABASE_PASSWORD'] = 'jarki'
+app.config['MYSQL_DATABASE_PASSWORD'] = 'root'
 app.config['MYSQL_DATABASE_DB'] = 'photoshare'
 app.config['MYSQL_DATABASE_HOST'] = 'localhost'
 mysql.init_app(app)
@@ -38,6 +36,17 @@ conn = mysql.connect()
 cursor = conn.cursor()
 cursor.execute("SELECT email from Users")
 users = cursor.fetchall()
+
+#default page
+@app.route("/", methods=['GET'])
+def hello():
+	return render_template('hello.html', message='Welecome to Photoshare')
+
+
+if __name__ == "__main__":
+	#this is invoked when in the shell you run
+	#$ python app.py
+	app.run(port=5000, debug=True)
 
 def getUserList():
 	cursor = conn.cursor()
@@ -162,10 +171,6 @@ def isEmailUnique(email):
 		return True
 #end login code
 
-@app.route('/profile')
-@flask_login.login_required
-def protected():
-	return render_template('hello.html', name=flask_login.current_user.id, message="Here's your profile")
 
 #begin photo uploading code
 # photos uploaded using base64 encoding so they can be directly embeded in HTML
@@ -189,20 +194,6 @@ def upload_file():
 	else:
 		return render_template('upload.html')
 #end photo uploading code
-
-
-# User activity
-@app.route('/user_hot', methods=['GET'])
-@flask_login.login_required
-def user_hot():
-	cursor = conn.cursor()
-	cursor.execute("SELECT users.email FROM `pictures` "
-				   "LEFT JOIN users ON users.user_id = pictures.user_id "
-				   "LEFT JOIN comments ON users.user_id = comments.user_id "
-				   "GROUP BY users.user_id ORDER BY COUNT(users.user_id) DESC LIMIT 10")
-	emails = [x[0] for x in cursor.fetchall()]
-	return render_template("hot.html", emails=emails)
-
 
 
 """Friends start"""
@@ -348,17 +339,6 @@ def request_loader(request):
 
 """Users end"""
 
-#default page
-@app.route("/", methods=['GET'])
-def hello():
-	return render_template('hello.html', message='Welecome to Photoshare')
-
-
-if __name__ == "__main__":
-	#this is invoked when in the shell  you run
-	#$ python app.py
-	app.run(port=5000, debug=True)
-
 
 @app.route('/browsePhotos', methods=['GET'])
 @flask_login.login_required
@@ -395,7 +375,3 @@ def delete_album():
 	else:
 		return render_template('/delete.html', albums=getUsersAlbums(uid))
 
-def getComments(picture_id):
-	cursor = conn.cursor()
-	cursor.execute("SELECT comment, date, user_id FROM Comments WHERE picture_id = '{0}' ORDER BY date ASC".format(picture_id))
-	return cursor.fetchall()
