@@ -266,6 +266,76 @@ def add_friend_api():
 
 """Friends end"""
 
+
+"""Albums start"""
+def getAlbums():
+    user = User()
+    user.id = flask_login.current_user.id
+    uid = getUserIdFromEmail(flask_login.current_user.id)
+    cursor = conn.cursor()
+    cursor.execute("SELECT * FROM Albums WHERE user_id = '{0}'".format(uid))
+    return cursor.fetchall()
+
+
+@app.route("/albums/", methods=['POST'])
+@flask_login.login_required
+def create_album():
+    uid = getUserIdFromEmail(flask_login.current_user.id)
+    a_name = request.form.get('a_name')
+    if a_name in str(users):
+        return render_template('albums.html', name=flask_login.current_user.id, message='Repeated album name!')
+    doc = calcCurrent()
+    cursor = conn.cursor()
+    cursor.execute(
+        "INSERT INTO Albums (a_name, doc, user_id) VALUES ('{0}', '{1}', '{2}')".format(a_name, doc, uid))
+    conn.commit()
+    return render_template('albums.html', name=flask_login.current_user.id, message='New album created!',
+                           albums=getUserAlbums(uid))
+
+
+@app.route("/albums/", methods=['DELETE'])
+@flask_login.login_required
+def delete_album():
+    uid = getUserIdFromEmail(flask_login.current_user.id)
+    del_name = request.form.get('del_name')
+    cursor = conn.cursor()
+    cursor.execute(
+        "DELETE FROM Albums WHERE user_id = '{0}' AND a_name = '{1}'".format(uid, del_name))
+    conn.commit()
+    return render_template('albums.html', name=flask_login.current_user.id, message='Album deleted!',
+                           albums=getUserAlbums(uid))
+
+
+"""Friends end"""
+
+"""Users start"""
+@login_manager.user_loader
+def user_loader(email):
+    users = getUserList()
+    if not (email) or email not in str(users):
+        return
+    user = User()
+    user.id = email
+    return user
+
+
+@login_manager.request_loader
+def request_loader(request):
+    users = getUserList()
+    email = request.form.get('email')
+    if not (email) or email not in str(users):
+        return
+    user = User()
+    user.id = email
+    cursor = mysql.connect().cursor()
+    cursor.execute("SELECT password FROM Users WHERE email = '{0}'".format(email))
+    data = cursor.fetchall()
+    pwd = str(data[0][0])
+    user.is_authenticated = request.form['password'] == pwd
+    return user
+
+"""Users end"""
+
 #default page
 @app.route("/", methods=['GET'])
 def hello():

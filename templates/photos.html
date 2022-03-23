@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html>
+<title>Albums</title>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="stylesheet" href="https://www.w3schools.com/w3css/4/w3.css">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Montserrat">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
+<style>
+body,h1 {font-family: "Montserrat", sans-serif}
+img {margin-bottom: -7px}
+.w3-row-padding img {margin-bottom: 12px}
+
+/* Full-width input fields */
+input[type=text], input[type=password] {
+    width: 100%;
+    padding: 12px 20px;
+    margin: 8px 0;
+    display: inline-block;
+    border: 1px solid #ccc;
+    box-sizing: border-box;
+}
+
+/* Set a style for all buttons */
+button {
+    background-color: #4CAF50;
+    color: white;
+    padding: 14px 20px;
+    margin: 8px 0;
+    border: none;
+    cursor: pointer;
+    width: 100%;
+}
+
+button:hover {
+    opacity: 0.8;
+}
+
+/* Extra styles for the cancel button */
+.cancelbtn {
+    width: auto;
+    padding: 10px 18px;
+    background-color: #f44336;
+}
+
+/* Center the image and position the close button */
+.imgcontainer {
+    text-align: center;
+    margin: 24px 0 12px 0;
+    position: relative;
+}
+
+img.avatar {
+    width: 40%;
+    border-radius: 50%;
+}
+
+.container {
+    padding: 16px;
+}
+
+span.psw {
+    float: right;
+    padding-top: 16px;
+}
+
+/* The Modal (background) */
+.modal {
+    display: none; /* Hidden by default */
+    position: fixed; /* Stay in place */
+    z-index: 1; /* Sit on top */
+    left: 0;
+    top: 0;
+    width: 100%; /* Full width */
+    height: 100%; /* Full height */
+    overflow: auto; /* Enable scroll if needed */
+    background-color: rgb(0,0,0); /* Fallback color */
+    background-color: rgba(0,0,0,0.4); /* Black w/ opacity */
+    padding-top: 60px;
+}
+
+/* Modal Content/Box */
+.modal-content {
+    background-color: #fefefe;
+    margin: 5% auto 15% auto; /* 5% from the top, 15% from the bottom and centered */
+    border: 1px solid #888;
+    width: 80%; /* Could be more or less, depending on screen size */
+}
+
+/* The Close Button (x) */
+.close {
+    position: absolute;
+    right: 25px;
+    top: 0;
+    color: #000;
+    font-size: 35px;
+    font-weight: bold;
+}
+
+.close:hover,
+.close:focus {
+    color: red;
+    cursor: pointer;
+}
+
+/* Add Zoom Animation */
+.animate {
+    -webkit-animation: animatezoom 0.6s;
+    animation: animatezoom 0.6s
+}
+
+@-webkit-keyframes animatezoom {
+    from {-webkit-transform: scale(0)}
+    to {-webkit-transform: scale(1)}
+}
+
+@keyframes animatezoom {
+    from {transform: scale(0)}
+    to {transform: scale(1)}
+}
+
+/* Change styles for span and cancel button on extra small screens */
+@media screen and (max-width: 300px) {
+    span.psw {
+       display: block;
+       float: none;
+    }
+    .cancelbtn {
+       width: 100%;
+    }
+}
+
+
+
+
+
+</style>
+
+<head>
+
+</head>
+<body>
+
+<!-- Sidebar -->
+<nav class="w3-sidebar w3-black w3-animate-top w3-xxlarge" style="display:none;padding-top:150px" id="mySidebar">
+    <a href="javascript:void(0)" onclick="w3_close()"
+       class="w3-button w3-black w3-xxlarge w3-padding w3-display-topright" style="padding:6px 24px">
+        <i class="fa fa-remove"></i>
+    </a>
+    <div class="w3-bar-block w3-center">
+        <a href="/explore" class="w3-bar-item w3-button w3-text-grey w3-hover-black">Explore</a>
+        <a href="/search" class="w3-bar-item w3-button w3-text-grey w3-hover-black">Search</a>
+        <a href="/profile" class="w3-bar-item w3-button w3-text-grey w3-hover-black">Profile</a>
+        <a href="/albums" class="w3-bar-item w3-button w3-text-grey w3-hover-black">Albums</a>
+        <a href="/photos" class="w3-bar-item w3-button w3-text-grey w3-hover-black">Photos</a>
+        <a href="/upload" class="w3-bar-item w3-button w3-text-grey w3-hover-black">Upload</a>
+        <a href="/logout" class="w3-bar-item w3-button w3-text-grey w3-hover-black">Logout</a>
+    </div>
+</nav>
+
+<!-- !PAGE CONTENT! -->
+<div class="w3-content" style="max-width:1500px">
+
+    <!-- Header -->
+    <div class="w3-opacity">
+        <span class="w3-button w3-xxlarge w3-white w3-right" onclick="w3_open()"><i class="fa fa-bars"></i></span>
+        <div class="w3-clear"></div>
+        <header class="w3-center w3-margin-bottom">
+            <h1><b>Your Photos</b></h1>
+        </header>
+        <br/>
+
+        <div class="w3-row w3-container">
+            <div class="w3-col s8 w3-white w3-center">
+
+                {% if photos %}
+                <ul>
+                    {% for photo in photos %}
+
+                            <input type="image" src="data:image/png;base64, {{photo[0].decode('utf-8')}}"
+                                   style="width:50%" onclick="document.getElementById('id01').style.display='block'"/>
+
+                    {% endfor %}
+                </ul>
+
+                {% endif %}
+
+            </div>
+
+            <div id="id01" class="modal">
+                {% if photos %}
+                {% for photo in photos %}
+                <form class="modal-content animate" name="photo_modal">
+                    <div class="imgcontainer">
+                        <span onclick="document.getElementById('id01').style.display='none'" class="close"
+                              title="Close Modal">&times;</span>
+                    </div>
+
+                    <div class="container" onclick="getLikes({{photo[1]}})">
+                        <img src="data:image/png;base64, {{photo[0].decode('utf-8')}}" style="width: 50%">
+                        <br/>
+                        <label><b>{{photo[1]}}</b></label>
+                        <br/>
+                        {{photo[2]}}, {{photo[3]}}, {{photo[4]}}, {{photo[5]}}, {{photo[6]}}, {{photo[7]}},
+                        {{photo[8]}}, {{photo[9]}}
+                        {% if likes %} {{likes}} {% endif %}
+                        <input type="image" src="/static/like.png"
+                                   style="width:5%" onclick="checkLikes({{photo[1]}}); like({{photo[1]}})"/>
+                        <input type='text' name='comment' id='comment' placeholder='Comment'>
+
+                        <button type="submit" onclick="comment()">Submit</button>
+                    </div>
+                    <div class="container">
+                        {% if comments %}
+                        <ul>
+                            {% for comment in comments%}
+                            <li>{{comment}}</li>
+                            {% endfor %}
+                        </ul>
+                        {% endif %}
+                    </div>
+                </form>
+                {% endfor %}
+                {% endif %}
+            </div>
+            <div class="w3-col s3 w3-white w3-center">
+                <h2>Delete A Photo</h2>
+                <input type='text' name='a_name' id='del_id' placeholder='Photo Id'>
+
+                <button type="submit" onclick="delete_photo()">Delete Photo!</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Footer -->
+<footer class="w3-container w3-padding-64 w3-light-grey w3-center w3-opacity w3-xlarge" style="margin-top:128px">
+    <i class="fa fa-facebook-official w3-hover-opacity"></i>
+    <i class="fa fa-instagram w3-hover-opacity"></i>
+    <i class="fa fa-snapchat w3-hover-opacity"></i>
+    <i class="fa fa-pinterest-p w3-hover-opacity"></i>
+    <i class="fa fa-twitter w3-hover-opacity"></i>
+    <i class="fa fa-linkedin w3-hover-opacity"></i>
+    <p class="w3-medium">Powered by <a href="https://www.w3schools.com/w3css/default.asp" target="_blank"
+                                       class="w3-hover-text-green">w3.css</a></p>
+</footer>
+
+<script>
+  // Open and close sidebar
+function w3_open() {
+    document.getElementById("mySidebar").style.width = "100%";
+    document.getElementById("mySidebar").style.display = "block";
+}
+
+function w3_close() {
+    document.getElementById("mySidebar").style.display = "none";
+}
+
+
+
+
+
+</script>
+<script>
+// Get the modal
+var modal = document.getElementById('id01');
+
+// When the user clicks anywhere outside of the modal, close it
+window.onclick = function(event) {
+    if (event.target == modal) {
+        modal.style.display = "none";
+    }
+}
+
+
+
+
+
+</script>
+
+</body>
+</html>
