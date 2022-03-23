@@ -14,6 +14,8 @@ from flask import Flask, Response, request, render_template, redirect, url_for
 from flaskext.mysql import MySQL
 import flask_login
 
+from collections import Counter
+
 #for image uploading
 import os, base64
 
@@ -23,7 +25,7 @@ app.secret_key = 'super secret string'  # Change this!
 
 #These will need to be changed according to your creditionals
 app.config['MYSQL_DATABASE_USER'] = 'root'
-app.config['MYSQL_DATABASE_PASSWORD'] = 'cs460'
+app.config['MYSQL_DATABASE_PASSWORD'] = 'jarki'
 app.config['MYSQL_DATABASE_DB'] = 'photoshare'
 app.config['MYSQL_DATABASE_HOST'] = 'localhost'
 mysql.init_app(app)
@@ -188,6 +190,81 @@ def upload_file():
 		return render_template('upload.html')
 #end photo uploading code
 
+
+# User activity
+@app.route('/user_hot', methods=['GET'])
+@flask_login.login_required
+def user_hot():
+	cursor = conn.cursor()
+	cursor.execute("SELECT users.email FROM `pictures` "
+				   "LEFT JOIN users ON users.user_id = pictures.user_id "
+				   "LEFT JOIN comments ON users.user_id = comments.user_id "
+				   "GROUP BY users.user_id ORDER BY COUNT(users.user_id) DESC LIMIT 10")
+	emails = [x[0] for x in cursor.fetchall()]
+	return render_template("hot.html", emails=emails)
+
+
+
+"""Friends start"""
+# Friend home page, including my friends, friend recommendation, user search
+@app.route('/friend', methods=['GET'])
+@flask_login.login_required
+def friend_index():
+	cursor = conn.cursor()
+	# my friends
+	cursor.execute(f"SELECT t2.email AS friend_eamil FROM users "
+				   f"INNER JOIN friends_with AS t1 ON users.user_id = t1.user_id "
+				   f"INNER JOIN users AS t2 ON t1.friend_uid = t2.user_id "
+				   f"WHERE users.email='{flask_login.current_user.id}'")
+
+	friend_emails = [x[0] for x in cursor.fetchall()]
+
+	# you like
+	recommend = []
+	for email in friend_emails:
+		cursor.execute(f"SELECT t2.email AS friend_eamil FROM users "
+					   f"INNER JOIN friends_with AS t1 ON users.user_id = t1.user_id "
+					   f"INNER JOIN users AS t2 ON t1.friend_uid = t2.user_id "
+					   f"WHERE users.email='{email}'")
+		recommend.extend([x[0] for x in cursor.fetchall()])
+
+	if recommend:
+		recommend_emails = [x[0] for x in sorted(dict(Counter(recommend)).items(), key=lambda x: x[1], reverse=True)[:15]]
+	else:
+		recommend_emails = None
+
+	return render_template("friend.html", name=flask_login.current_user.id, friend_emails=friend_emails, recommend_emails=recommend_emails)
+
+
+@app.route('/find_friend', methods=['GET'])
+@flask_login.login_required
+def find_friend():
+	email = flask.request.args.get('email')
+	cursor = conn.cursor()
+	cursor.execute(f"select email from users where email like '%{email}%'")
+
+	search_emails = [x[0] for x in cursor.fetchall() if x[0] != flask_login.current_user.id]
+	message = f"A total of {len(search_emails)} other users were found"
+	return render_template("find_friend.html", search_emails=search_emails, message=message)
+
+
+@app.route('/add_friend_api', methods=['GET'])
+@flask_login.login_required
+def add_friend_api():
+	email = flask.request.args.get('email')
+	cursor = conn.cursor()
+	cursor.execute(f"select user_id from users where email = '{flask_login.current_user.id}'")
+	user_id = cursor.fetchone()[0]
+
+	cursor.execute(f"select user_id from users where email = '{email}'")
+	friend_uid = cursor.fetchone()[0]
+
+	cursor.execute(f"INSERT INTO friends_with VALUES({user_id}, {friend_uid})")
+	cursor.close()
+	return "Successfully add a friend<br><a href='/'>Home</a>"
+
+
+"""Friends end"""
 
 #default page
 @app.route("/", methods=['GET'])
