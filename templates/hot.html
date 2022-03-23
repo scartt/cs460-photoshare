@@ -1,0 +1,15 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Hot</title>
+</head>
+<body>
+    <h1>Most active users</h1>
+        <ol>
+        {% for email in emails %}
+            <li>{{email}}</li>
+        {% endfor %}
+        </ol>
+</body>
+</html>

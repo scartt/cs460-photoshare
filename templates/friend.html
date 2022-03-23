@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Friend</title>
+</head>
+<body>
+    {% if name %}
+      <h1>Hello {{ name }}!</h1>
+    {% endif %}
+
+    <h2>My Friends: </h2>
+        <ul>
+        {% for friend_email in friend_emails %}
+            <li>{{friend_email}}</li>
+        {% endfor %}
+        </ul>
+
+    {% if recommend_emails %}
+      <h1>Friend recommendation:</h1>
+        {% for email in recommend_emails %}
+        <ul>
+            <li>
+                <form action='add_friend_api' method='GET'>
+                    <span>{{email}}</span>
+                    <input hidden type='text' name='email' value={{friend_email}}></input>
+                    <input type='submit' name='submit' value="Add buddy"></input>
+                </form>
+            </li>
+        </ul>
+
+        {% endfor %}
+    {% endif %}
+
+    <h1>Search User</h1>
+        <form action='find_friend' method='GET'>
+            <input type='text' name='email' placeholder='email'></input>
+            <input type='submit' name='submit' value="find the user"></input>
+        </form>
+
+    <a href='/'>Home</a>
+</body>
+</html>
