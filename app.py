@@ -186,23 +186,23 @@ def upload_file():
 
 		cursor = conn.cursor()
 
-		# 插入Tag
+		
 		for tag in tags:
 			cursor.execute(f"INSERT INTO tags (tag) SELECT '{tag}' FROM DUAL "
 						   f"WHERE NOT EXISTS ( SELECT * FROM tags WHERE tags.tag = '{tag}' );")
 
-		# 插入 Album
+		
 		cursor.execute(f"INSERT INTO albums (name, user_id) SELECT '{album}', {uid} FROM DUAL "
 					   f"WHERE NOT EXISTS ( SELECT * FROM albums WHERE albums.name = '{album}' and albums.user_id={uid});")
 
-		# 插入图片
+		
 		cursor.execute('''INSERT INTO Pictures (imgdata, user_id, caption) VALUES (%s, %s, %s )''', (photo_data, uid, caption))
 
-		# 获取图片 id
+		
 		cursor.execute("SELECT max(picture_id) FROM Pictures")
 		picture_id = cursor.fetchone()[0]
 
-		# 关联 tag
+		
 		if tags:
 			# print(f"-- SELECT tag_id FROM tags WHERE tag in {str(tuple(tags))}")
 			if len(tags) == 1:
@@ -213,7 +213,7 @@ def upload_file():
 				# print(f'''INSERT INTO tagged_picture (picture_id, tag_id) VALUES ({picture_id}, {tag_id[0]})''')
 				cursor.execute(f'''INSERT INTO tagged_picture (picture_id, tag_id) VALUES({picture_id}, {tag_id[0]})''')
 
-		# 关联 album
+		
 		cursor.execute(f"SELECT album_id FROM albums where name='{album}' and user_id={uid}")
 		album_id = cursor.fetchone()[0]
 		cursor.execute(f'''INSERT INTO stored_in (picture_id, album_id) VALUES  ({picture_id}, {album_id})''')
@@ -297,7 +297,7 @@ def add_friend_api():
 	cursor.close()
 	return "Successfully add a friend<br><a href='/'>Home</a>"
 
-"""Friends 结束"""
+"""Friends end"""
 
 
 """browse"""
