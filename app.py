@@ -266,6 +266,18 @@ def add_friend_api():
 
 """Friends end"""
 
+@app.route('/createAlbum', methods=['GET', 'POST'])
+@flask_login.login_required
+def create_album():
+	if request.method == 'POST':
+		uid = getUserIdFromEmail(flask_login.current_user.id)
+		name = request.form.get('name')
+		cursor = conn.cursor()
+		cursor.execute('INSERT INTO Albums (user_id, name, date_of_creation) VALUES (%s, %s, NOW())' ,(uid,name))
+		conn.commit()
+		return render_template('hello.html', name=flask_login.current_user.id, message='Album Created!', albums=getUsersAlbums(uid))
+	else:
+		return render_template('/create.html')
 
 """Albums start"""
 def getAlbums():
@@ -306,7 +318,7 @@ def delete_album():
                            albums=getUserAlbums(uid))
 
 
-"""Friends end"""
+"""Albums end"""
 
 """Users start"""
 @login_manager.user_loader
@@ -346,3 +358,44 @@ if __name__ == "__main__":
 	#this is invoked when in the shell  you run
 	#$ python app.py
 	app.run(port=5000, debug=True)
+
+
+@app.route('/browsePhotos', methods=['GET'])
+@flask_login.login_required
+def browse_photos():
+		uid = getUserIdFromEmail(flask_login.current_user.id)
+		return render_template('hello.html', name=flask_login.current_user.id, photos=getUsersPhotos(uid),base64=base64)
+
+
+
+@app.route('/createAlbum', methods=['GET', 'POST'])
+@flask_login.login_required
+def create_album():
+	if request.method == 'POST':
+		uid = getUserIdFromEmail(flask_login.current_user.id)
+		name = request.form.get('name')
+		cursor = conn.cursor()
+		cursor.execute('INSERT INTO Albums (user_id, name, date_of_creation) VALUES (%s, %s, NOW())' ,(uid,name))
+		conn.commit()
+		return render_template('hello.html', name=flask_login.current_user.id, message='Album Created!', albums=getUsersAlbums(uid))
+	else:
+		return render_template('/create.html')
+
+
+@app.route('/deleteAlbum', methods=['GET', 'POST'])
+@flask_login.login_required
+def delete_album():
+	uid = getUserIdFromEmail(flask_login.current_user.id)
+	if request.method == 'POST':
+		album_id = request.form.get('album')
+		cursor = conn.cursor()
+		cursor.execute("DELETE FROM Albums WHERE album_id = '{0}'".format(album_id))
+		conn.commit()
+		return render_template('hello.html', name=flask_login.current_user.id, message='Album deleted!', albums=getUsersAlbums(uid))
+	else:
+		return render_template('/delete.html', albums=getUsersAlbums(uid))
+
+def getComments(picture_id):
+	cursor = conn.cursor()
+	cursor.execute("SELECT comment, date, user_id FROM Comments WHERE picture_id = '{0}' ORDER BY date ASC".format(picture_id))
+	return cursor.fetchall()

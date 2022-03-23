@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<meta charset="utf-8">
+		<title>Comments</title>
+		 
+  </style>
+	</head>
+	<body>
+		{% if comments %}
+		<h3>Users with comments that match: {{text}}</h3>
+		<table>
+  <tr>
+
+  </tr>
+  {% for row in comments %}
+   <tr>
+    <td>{{row[0]}}</td>
+    <td>{{row[1]}}</td>
+    <td>{{row[2]}}</td>
+  </tr>
+  {% endfor %}
+  </table>
+
+		{% endif %}
+
+		{% if not comments %}
+		<h3>There are no results.</h3>
+		{% endif %}
+		<a href="/">Go Home</a>
+	</body>
+</html>

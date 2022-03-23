@@ -1,32 +1,4 @@
 <head>
-    <title>Albums</title>
-    <style>
-    img {
-      width: 250px;
-    }
-  </style>
-</head>
-    <body>
-        {% if photos %}
-                <div class="title">
-            <h1>You can review images in the album</h1>
-        </div>
-    <ul>
-    {% for photo in photos %}
-        <li>{{photo[2]}}<br />
-    {% endfor %}
-    </ul>
-{% endif %}
-            {% if not photos %}
-                                <div class="title">
-            <h1>There are no photos associated with album {{album}}<h1>
-        </div>
-            {% endif %}
-            <a href="/">Go Home</a>
-    </body>
-
-
-<head>
     <title>Delete an album!</title>
 </head>
     <body>
