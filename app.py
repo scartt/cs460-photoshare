@@ -14,6 +14,8 @@ from flask import Flask, Response, request, render_template, redirect, url_for
 from flaskext.mysql import MySQL
 import flask_login
 
+from collections import Counter
+
 #for image uploading
 import os, base64
 
@@ -23,7 +25,7 @@ app.secret_key = 'super secret string'  # Change this!
 
 #These will need to be changed according to your creditionals
 app.config['MYSQL_DATABASE_USER'] = 'root'
-app.config['MYSQL_DATABASE_PASSWORD'] = 'root'
+app.config['MYSQL_DATABASE_PASSWORD'] = '123456'
 app.config['MYSQL_DATABASE_DB'] = 'photoshare'
 app.config['MYSQL_DATABASE_HOST'] = 'localhost'
 mysql.init_app(app)
@@ -36,17 +38,6 @@ conn = mysql.connect()
 cursor = conn.cursor()
 cursor.execute("SELECT email from Users")
 users = cursor.fetchall()
-
-#default page
-@app.route("/", methods=['GET'])
-def hello():
-	return render_template('hello.html', message='Welecome to Photoshare')
-
-
-if __name__ == "__main__":
-	#this is invoked when in the shell you run
-	#$ python app.py
-	app.run(port=5000, debug=True)
 
 def getUserList():
 	cursor = conn.cursor()
@@ -171,6 +162,10 @@ def isEmailUnique(email):
 		return True
 #end login code
 
+@app.route('/profile')
+@flask_login.login_required
+def protected():
+	return render_template('hello.html', name=flask_login.current_user.id, message="Here's your profile")
 
 #begin photo uploading code
 # photos uploaded using base64 encoding so they can be directly embeded in HTML
@@ -185,15 +180,63 @@ def upload_file():
 		uid = getUserIdFromEmail(flask_login.current_user.id)
 		imgfile = request.files['photo']
 		caption = request.form.get('caption')
-		photo_data =imgfile.read()
+		tags = request.form.get('tags').lower().strip().split()
+		album = request.form.get('album')
+		photo_data = imgfile.read()
+
 		cursor = conn.cursor()
+
+		# 插入Tag
+		for tag in tags:
+			cursor.execute(f"INSERT INTO tags (tag) SELECT '{tag}' FROM DUAL "
+						   f"WHERE NOT EXISTS ( SELECT * FROM tags WHERE tags.tag = '{tag}' );")
+
+		# 插入 Album
+		cursor.execute(f"INSERT INTO albums (name, user_id) SELECT '{album}', {uid} FROM DUAL "
+					   f"WHERE NOT EXISTS ( SELECT * FROM albums WHERE albums.name = '{album}' and albums.user_id={uid});")
+
+		# 插入图片
 		cursor.execute('''INSERT INTO Pictures (imgdata, user_id, caption) VALUES (%s, %s, %s )''', (photo_data, uid, caption))
+
+		# 获取图片 id
+		cursor.execute("SELECT max(picture_id) FROM Pictures")
+		picture_id = cursor.fetchone()[0]
+
+		# 关联 tag
+		if tags:
+			# print(f"-- SELECT tag_id FROM tags WHERE tag in {str(tuple(tags))}")
+			if len(tags) == 1:
+				cursor.execute(f"SELECT tag_id FROM tags WHERE tag = '{tags[0]}'")
+			else:
+				cursor.execute(f"SELECT tag_id FROM tags WHERE tag in {str(tuple(tags))}")
+			for tag_id in cursor.fetchall():
+				# print(f'''INSERT INTO tagged_picture (picture_id, tag_id) VALUES ({picture_id}, {tag_id[0]})''')
+				cursor.execute(f'''INSERT INTO tagged_picture (picture_id, tag_id) VALUES({picture_id}, {tag_id[0]})''')
+
+		# 关联 album
+		cursor.execute(f"SELECT album_id FROM albums where name='{album}' and user_id={uid}")
+		album_id = cursor.fetchone()[0]
+		cursor.execute(f'''INSERT INTO stored_in (picture_id, album_id) VALUES  ({picture_id}, {album_id})''')
+
 		conn.commit()
 		return render_template('hello.html', name=flask_login.current_user.id, message='Photo uploaded!', photos=getUsersPhotos(uid), base64=base64)
 	#The method is GET so we return a  HTML form to upload the a photo.
 	else:
 		return render_template('upload.html')
 #end photo uploading code
+
+
+# User activity
+@app.route('/user_hot', methods=['GET'])
+@flask_login.login_required
+def user_hot():
+	cursor = conn.cursor()
+	cursor.execute("SELECT users.email FROM `pictures` "
+				   "LEFT JOIN users ON users.user_id = pictures.user_id "
+				   "LEFT JOIN comments ON users.user_id = comments.user_id "
+				   "GROUP BY users.user_id ORDER BY COUNT(users.user_id) DESC LIMIT 10")
+	emails = [x[0] for x in cursor.fetchall()]
+	return render_template("hot.html", emails=emails)
 
 
 """Friends start"""
@@ -254,124 +297,114 @@ def add_friend_api():
 	cursor.close()
 	return "Successfully add a friend<br><a href='/'>Home</a>"
 
+"""Friends 结束"""
 
-"""Friends end"""
 
-@app.route('/createAlbum', methods=['GET', 'POST'])
+"""browse"""
+@app.route('/create_album', methods=['GET'])
 @flask_login.login_required
 def create_album():
-	if request.method == 'POST':
-		uid = getUserIdFromEmail(flask_login.current_user.id)
-		name = request.form.get('name')
-		cursor = conn.cursor()
-		cursor.execute('INSERT INTO Albums (user_id, name, date_of_creation) VALUES (%s, %s, NOW())' ,(uid,name))
-		conn.commit()
-		return render_template('hello.html', name=flask_login.current_user.id, message='Album Created!', albums=getUsersAlbums(uid))
+	album = flask.request.args.get('name')
+	if album is None:
+		return render_template('create_album.html')
 	else:
-		return render_template('/create.html')
-
-"""Albums start"""
-def getAlbums():
-    user = User()
-    user.id = flask_login.current_user.id
-    uid = getUserIdFromEmail(flask_login.current_user.id)
-    cursor = conn.cursor()
-    cursor.execute("SELECT * FROM Albums WHERE user_id = '{0}'".format(uid))
-    return cursor.fetchall()
-
-
-@app.route("/albums/", methods=['POST'])
-@flask_login.login_required
-def create_album():
-    uid = getUserIdFromEmail(flask_login.current_user.id)
-    a_name = request.form.get('a_name')
-    if a_name in str(users):
-        return render_template('albums.html', name=flask_login.current_user.id, message='Repeated album name!')
-    doc = calcCurrent()
-    cursor = conn.cursor()
-    cursor.execute(
-        "INSERT INTO Albums (a_name, doc, user_id) VALUES ('{0}', '{1}', '{2}')".format(a_name, doc, uid))
-    conn.commit()
-    return render_template('albums.html', name=flask_login.current_user.id, message='New album created!',
-                           albums=getUserAlbums(uid))
-
-
-@app.route("/albums/", methods=['DELETE'])
-@flask_login.login_required
-def delete_album():
-    uid = getUserIdFromEmail(flask_login.current_user.id)
-    del_name = request.form.get('del_name')
-    cursor = conn.cursor()
-    cursor.execute(
-        "DELETE FROM Albums WHERE user_id = '{0}' AND a_name = '{1}'".format(uid, del_name))
-    conn.commit()
-    return render_template('albums.html', name=flask_login.current_user.id, message='Album deleted!',
-                           albums=getUserAlbums(uid))
-
-
-"""Albums end"""
-
-"""Users start"""
-@login_manager.user_loader
-def user_loader(email):
-    users = getUserList()
-    if not (email) or email not in str(users):
-        return
-    user = User()
-    user.id = email
-    return user
-
-
-@login_manager.request_loader
-def request_loader(request):
-    users = getUserList()
-    email = request.form.get('email')
-    if not (email) or email not in str(users):
-        return
-    user = User()
-    user.id = email
-    cursor = mysql.connect().cursor()
-    cursor.execute("SELECT password FROM Users WHERE email = '{0}'".format(email))
-    data = cursor.fetchall()
-    pwd = str(data[0][0])
-    user.is_authenticated = request.form['password'] == pwd
-    return user
-
-"""Users end"""
-
-
-@app.route('/browsePhotos', methods=['GET'])
-@flask_login.login_required
-def browse_photos():
 		uid = getUserIdFromEmail(flask_login.current_user.id)
-		return render_template('hello.html', name=flask_login.current_user.id, photos=getUsersPhotos(uid),base64=base64)
-
-
-
-@app.route('/createAlbum', methods=['GET', 'POST'])
-@flask_login.login_required
-def create_album():
-	if request.method == 'POST':
-		uid = getUserIdFromEmail(flask_login.current_user.id)
-		name = request.form.get('name')
-		cursor = conn.cursor()
-		cursor.execute('INSERT INTO Albums (user_id, name, date_of_creation) VALUES (%s, %s, NOW())' ,(uid,name))
+		cursor.execute(f"INSERT INTO albums (name, user_id) SELECT '{album}', {uid} FROM DUAL "
+					   f"WHERE NOT EXISTS ( SELECT * FROM albums WHERE albums.name = '{album}' and albums.user_id={uid});")
 		conn.commit()
-		return render_template('hello.html', name=flask_login.current_user.id, message='Album Created!', albums=getUsersAlbums(uid))
-	else:
-		return render_template('/create.html')
+		return "Successfully create album<br><a href='/'>Home</a>"
 
 
-@app.route('/deleteAlbum', methods=['GET', 'POST'])
+
+@app.route('/my_album', methods=['GET'])
 @flask_login.login_required
-def delete_album():
+def my_album():
+	message = "My Album"
 	uid = getUserIdFromEmail(flask_login.current_user.id)
-	if request.method == 'POST':
-		album_id = request.form.get('album')
-		cursor = conn.cursor()
-		cursor.execute("DELETE FROM Albums WHERE album_id = '{0}'".format(album_id))
-		conn.commit()
-		return render_template('hello.html', name=flask_login.current_user.id, message='Album deleted!', albums=getUsersAlbums(uid))
-	else:
-		return render_template('/delete.html', albums=getUsersAlbums(uid))
+	cursor = conn.cursor()
+	cursor.execute(f"SELECT album_id, name FROM albums WHERE user_id={uid}")
+	albums = []
+	for album_id, album_name in cursor.fetchall():
+		item = {'name': album_name}
+		cursor.execute(f"SELECT pictures.picture_id, caption, imgdata FROM "
+					   f"pictures LEFT JOIN stored_in ON pictures.picture_id = stored_in.picture_id "
+					   f"WHERE album_id = {album_id}")
+		item["pictures"] = []
+		for picture_id, caption, imgdata in cursor.fetchall():
+			item["pictures"].append({
+				"picture_id": picture_id,
+				"caption": caption,
+				"imgdata": base64.b64encode(imgdata).decode("ascii")
+			})
 
+		albums.append(item)
+	# print(albums)
+	return render_template('my_album.html', message=message, albums=albums)
+
+@app.route('/delete_album', methods=['GET'])
+@flask_login.login_required
+def delete_album():
+	album = flask.request.args.get('name')
+	cursor = conn.cursor()
+
+	uid = getUserIdFromEmail(flask_login.current_user.id)
+	print(f"-- SELECT album_id FROM albums where name='{album}' and user_id={uid}")
+	cursor.execute(f"SELECT album_id FROM albums where name='{album}' and user_id={uid}")
+	album_id = cursor.fetchone()[0]
+
+	cursor.execute(f"select picture_id from stored_in where album_id={album_id}")
+	picture_ids = [x[0] for x in cursor.fetchall()]
+
+	cursor.execute('SET foreign_key_checks = 0')
+	cursor.execute(f'delete from stored_in where album_id={album_id}')
+	cursor.execute(f'delete from albums where album_id={album_id}')
+
+	for picture_id in picture_ids:
+		cursor.execute(f'delete from pictures where picture_id={picture_id}')
+		cursor.execute(f'delete from tagged_picture where picture_id={picture_id}')
+	cursor.execute('SET foreign_key_checks = 1')
+
+	return "Successfully delete album<br><a href='/'>Home</a>"
+
+
+@app.route('/delete_picture', methods=['GET'])
+@flask_login.login_required
+def delete_picture():
+	picture_id = flask.request.args.get('picture_id')
+	cursor = conn.cursor()
+	cursor.execute('SET foreign_key_checks = 0')
+	cursor.execute(f'delete from stored_in where picture_id={picture_id}')
+	cursor.execute(f'delete from pictures where picture_id={picture_id}')
+	cursor.execute(f'delete from tagged_picture where picture_id={picture_id}')
+	cursor.execute('SET foreign_key_checks = 1')
+	cursor.close()
+	conn.commit()
+	return "Successfully delete picture<br><a href='/'>Home</a>"
+
+
+@app.route('/picture/<picture_id>', methods=['GET'])
+@flask_login.login_required
+def show_picture(picture_id):
+	# picture_id = flask.request.args.get('picture_id')
+	cursor = conn.cursor()
+	cursor.execute(f'select imgdata, caption from pictures where picture_id={picture_id}')
+	imgdata, captioin = cursor.fetchone()
+	imgdata = base64.b64encode(imgdata).decode("ascii")
+	cursor.execute(f'select tag from tagged_picture '
+				   f'LEFT JOIN tags ON tags.tag_id=tagged_picture.tag_id '
+				   f'where picture_id={picture_id}')
+	tags = [x[0] for x in cursor.fetchall()]
+	cursor.close()
+	return render_template("picture.html", captioin=captioin, imgdata=imgdata, tags=tags)
+
+
+#default page
+@app.route("/", methods=['GET'])
+def hello():
+	return render_template('hello.html', message='Welecome to Photoshare')
+
+
+if __name__ == "__main__":
+	#this is invoked when in the shell  you run
+	#$ python app.py
+	app.run(port=5000, debug=True)
