@@ -25,7 +25,7 @@ app.secret_key = 'super secret string'  # Change this!
 
 #These will need to be changed according to your creditionals
 app.config['MYSQL_DATABASE_USER'] = 'root'
-app.config['MYSQL_DATABASE_PASSWORD'] = '123456'
+app.config['MYSQL_DATABASE_PASSWORD'] = 'jarki'
 app.config['MYSQL_DATABASE_DB'] = 'photoshare'
 app.config['MYSQL_DATABASE_HOST'] = 'localhost'
 mysql.init_app(app)
@@ -185,24 +185,21 @@ def upload_file():
 		photo_data = imgfile.read()
 
 		cursor = conn.cursor()
-
-		
+        #insert tag
 		for tag in tags:
 			cursor.execute(f"INSERT INTO tags (tag) SELECT '{tag}' FROM DUAL "
 						   f"WHERE NOT EXISTS ( SELECT * FROM tags WHERE tags.tag = '{tag}' );")
 
-		
+		# insert album
 		cursor.execute(f"INSERT INTO albums (name, user_id) SELECT '{album}', {uid} FROM DUAL "
 					   f"WHERE NOT EXISTS ( SELECT * FROM albums WHERE albums.name = '{album}' and albums.user_id={uid});")
 
-		
+		# insert pic
 		cursor.execute('''INSERT INTO Pictures (imgdata, user_id, caption) VALUES (%s, %s, %s )''', (photo_data, uid, caption))
 
-		
 		cursor.execute("SELECT max(picture_id) FROM Pictures")
 		picture_id = cursor.fetchone()[0]
 
-		
 		if tags:
 			# print(f"-- SELECT tag_id FROM tags WHERE tag in {str(tuple(tags))}")
 			if len(tags) == 1:
@@ -213,7 +210,6 @@ def upload_file():
 				# print(f'''INSERT INTO tagged_picture (picture_id, tag_id) VALUES ({picture_id}, {tag_id[0]})''')
 				cursor.execute(f'''INSERT INTO tagged_picture (picture_id, tag_id) VALUES({picture_id}, {tag_id[0]})''')
 
-		
 		cursor.execute(f"SELECT album_id FROM albums where name='{album}' and user_id={uid}")
 		album_id = cursor.fetchone()[0]
 		cursor.execute(f'''INSERT INTO stored_in (picture_id, album_id) VALUES  ({picture_id}, {album_id})''')
@@ -226,17 +222,68 @@ def upload_file():
 #end photo uploading code
 
 
-# User activity
-@app.route('/user_hot', methods=['GET'])
-@flask_login.login_required
-def user_hot():
-	cursor = conn.cursor()
-	cursor.execute("SELECT users.email FROM `pictures` "
-				   "LEFT JOIN users ON users.user_id = pictures.user_id "
-				   "LEFT JOIN comments ON users.user_id = comments.user_id "
-				   "GROUP BY users.user_id ORDER BY COUNT(users.user_id) DESC LIMIT 10")
-	emails = [x[0] for x in cursor.fetchall()]
-	return render_template("hot.html", emails=emails)
+# Rank
+@app.route('/hot', methods=['GET'])
+def hot():
+	return """<ul>
+		<li><a href="/hot/user">User</a></li>
+		<li><a href="/hot/tag">Tag</a></li>
+	</ul>"""
+
+@app.route('/hot/<cate>', methods=['GET'])
+def hot_cate(cate):
+	if cate == "user":
+		cursor = conn.cursor()
+		cursor.execute("SELECT users.email FROM `pictures` "
+					   "LEFT JOIN users ON users.user_id = pictures.user_id "
+					   "LEFT JOIN comments ON users.user_id = comments.user_id "
+					   "GROUP BY users.user_id ORDER BY COUNT(users.user_id) DESC LIMIT 10")
+		emails = [x[0] for x in cursor.fetchall()]
+		return render_template("hot.html", emails=emails)
+	elif cate == "tag":
+		cursor = conn.cursor()
+		cursor.execute("SELECT tags.tag_id, tag FROM tags "
+					   "JOIN tagged_picture on tags.tag_id=tagged_picture.tag_id "
+					   "GROUP BY tags.tag_id ORDER BY count(tags.tag_id) desc")
+		tags = [{"tag": tag[1], "tag_id": tag[0]} for tag in cursor.fetchall()]
+		return render_template("hot.html", tags=tags)
+	else:
+		raise
+
+@app.route('/search', methods=["GET"])
+def search():
+	tags = flask.request.args.get("name")
+	if tags:
+		tags = tags.lower().split()
+		picture_ids = []
+		items = dict()
+		cursor = conn.cursor()
+		for tag in tags:
+			cursor.execute(f"SELECT pictures.picture_id, imgdata, caption FROM pictures "
+						   f"join tagged_picture on pictures.picture_id=tagged_picture.picture_id "
+						   f"join tags on tags.tag_id=tagged_picture.tag_id where "
+						   f"tags.tag='{tag}'")
+			for picture_id, imgdata, caption in cursor.fetchall():
+				imgdata = base64.b64encode(imgdata).decode("ascii")
+				items[picture_id] = {
+					"picture_id": picture_id,
+					"imgdata": imgdata,
+					"caption": caption
+				}
+				picture_ids.append(picture_id)
+
+		pictures = []
+		for pic_id, pic_num in Counter(picture_ids).items():
+			if pic_num == len(tags):
+				pictures.append(items[pic_id])
+
+		message = f"A total of {len(pictures)} images were searched"
+		return render_template("browse_by_picture.html", items=pictures, message=message)
+	else:
+		return """<form action='/search' method='GET'>
+						<input type='text' name='name' value=''></input>
+						<input type='submit' name='submit' value="search"></input>
+					</form><a href='/'>Home</a>"""
 
 
 """Friends start"""
@@ -315,31 +362,52 @@ def create_album():
 		return "Successfully create album<br><a href='/'>Home</a>"
 
 
-
-@app.route('/my_album', methods=['GET'])
+@app.route('/my_pictures')
 @flask_login.login_required
-def my_album():
-	message = "My Album"
-	uid = getUserIdFromEmail(flask_login.current_user.id)
-	cursor = conn.cursor()
-	cursor.execute(f"SELECT album_id, name FROM albums WHERE user_id={uid}")
-	albums = []
-	for album_id, album_name in cursor.fetchall():
-		item = {'name': album_name}
-		cursor.execute(f"SELECT pictures.picture_id, caption, imgdata FROM "
-					   f"pictures LEFT JOIN stored_in ON pictures.picture_id = stored_in.picture_id "
-					   f"WHERE album_id = {album_id}")
-		item["pictures"] = []
-		for picture_id, caption, imgdata in cursor.fetchall():
-			item["pictures"].append({
-				"picture_id": picture_id,
-				"caption": caption,
-				"imgdata": base64.b64encode(imgdata).decode("ascii")
-			})
+def my_pictures():
+	return """    <ul>
+	        <li><a href="browse_by_my/album">By Album</a></li>
+	        <li><a href="browse_by_my/tag">By Tag</a></li>
+	        <li><a href="browse_by_my/picture">By Pictures</a></li>
+	    </ul>
+	    <a href='/'>Home</a>"""
 
-		albums.append(item)
-	# print(albums)
-	return render_template('my_album.html', message=message, albums=albums)
+
+@app.route('/browse_by_my/<cate>')
+@flask_login.login_required
+def browse_by_my(cate):
+	cursor = conn.cursor()
+	albums = []
+	tags = []
+	pictures = []
+	uid = getUserIdFromEmail(flask_login.current_user.id)
+
+	if cate == "album":
+		cursor.execute(f"SELECT album_id, name FROM albums WHERE user_id={uid}")
+		for album_id, album_name in cursor.fetchall():
+			item = {'name': album_name, "album_id": album_id}
+			albums.append(item)
+	elif cate == "tag":
+		cursor.execute(f"SELECT tags.tag_id, tag FROM tags "
+					   f"join tagged_picture on tags.tag_id=tagged_picture.tag_id "
+					   f"join pictures on pictures.picture_id=tagged_picture.picture_id "
+					   f"WHERE user_id={uid}")
+		tags = []
+		for tag_id, tag in cursor.fetchall():
+			item = {'tag_id': tag_id, "tag": tag}
+			tags.append(item)
+	elif cate == "picture":
+		cursor.execute(f"SELECT picture_id, caption, imgdata FROM pictures WHERE user_id={uid}")
+		for picture in cursor.fetchall():
+			pictures.append({
+				"picture_id": picture[0],
+				"caption": picture[1],
+				"imgdata": base64.b64encode(picture[2]).decode("ascii")
+			})
+	else:
+		raise
+	return render_template("browse_my.html", albums=albums, tags=tags, pictures=pictures)
+
 
 @app.route('/delete_album', methods=['GET'])
 @flask_login.login_required
@@ -383,7 +451,7 @@ def delete_picture():
 
 
 @app.route('/picture/<picture_id>', methods=['GET'])
-@flask_login.login_required
+# @flask_login.login_required
 def show_picture(picture_id):
 	# picture_id = flask.request.args.get('picture_id')
 	cursor = conn.cursor()
@@ -394,8 +462,122 @@ def show_picture(picture_id):
 				   f'LEFT JOIN tags ON tags.tag_id=tagged_picture.tag_id '
 				   f'where picture_id={picture_id}')
 	tags = [x[0] for x in cursor.fetchall()]
+
+	cursor.execute(f'select words from comments '
+				   f'join commented_on on commented_on.comment_id=comments.comment_id '
+				   f'where picture_id={picture_id}')
+	comments = [x[0] for x in cursor.fetchall()]
+
+	if flask_login.current_user.is_anonymous:
+		is_like = False
+	else:
+		uid = getUserIdFromEmail(flask_login.current_user.id)
+
+		cursor.execute(f'select * from liked_pictures where user_id={uid} and picture_id={picture_id}')
+		is_like = True if cursor.fetchone() else False
+
 	cursor.close()
-	return render_template("picture.html", captioin=captioin, imgdata=imgdata, tags=tags)
+	return render_template("picture.html", captioin=captioin, imgdata=imgdata, tags=tags,
+						   picture_id=picture_id, comments=comments, is_like=is_like)
+
+
+@app.route("/browse_index", methods=["GET"])
+def browse_index():
+	return """    <ul>
+        <li><a href="browse_by_album">By Album</a></li>
+        <li><a href="browse_by_tag">By Tag</a></li>
+        <li><a href="browse_by_picture">By Pictures</a></li>
+    </ul>
+    <a href='/'>Home</a>"""
+
+
+@app.route("/browse_by_tag", methods=["GET"])
+def browse_by_tag():
+	cursor = conn.cursor()
+	cursor.execute("select tag_id, tag from tags")
+	items = [{"tag_id": x[0], "tag": x[1]} for x in cursor.fetchall()]
+	return render_template("browse_by_tag.html", items=items)
+
+@app.route("/browse_by_album", methods=["GET"])
+def browse_by_album():
+	cursor = conn.cursor()
+	cursor.execute(f"select albums.album_id, name, email from stored_in "
+				   f"join pictures on stored_in.picture_id=pictures.picture_id "
+				   f"join albums on albums.album_id=stored_in.album_id "
+				   f"join users on users.user_id=pictures.user_id")
+	albums = [{"album_id": x[0], "album": x[1], "email": x[2]} for x in cursor.fetchall()]
+	return render_template("browse_by_album.html", albums=albums)
+
+@app.route("/browse_by_picture", methods=["GET"])
+def browse_by_picture():
+	cursor = conn.cursor()
+	cursor.execute(f"select pictures.picture_id, imgdata, caption from pictures")
+	items = [{"picture_id": picture[0],
+			  "imgdata": base64.b64encode(picture[1]).decode("ascii"),
+			  "caption": picture[2]} for picture in cursor.fetchall()]
+	return render_template("browse_by_picture.html", items=items)
+
+
+@app.route("/browse/<cate>/<cate_id>", methods=["GET"])
+def browse(cate, cate_id):
+	cursor = conn.cursor()
+	if cate == "tag":
+		cursor.execute(f"select pictures.picture_id, imgdata, caption from pictures "
+					   f"join tagged_picture on pictures.picture_id=tagged_picture.picture_id "
+					   f"where tag_id={cate_id}")
+	elif cate == "album":
+		cursor.execute(f"select pictures.picture_id, imgdata, caption from pictures "
+					   f"join stored_in on pictures.picture_id=stored_in.picture_id "
+					   f"where album_id={cate_id}")
+	else:
+		raise ValueError
+
+	items = [{"picture_id": picture[0],
+			  "imgdata": base64.b64encode(picture[1]).decode("ascii"),
+			  "caption": picture[2]} for picture in cursor.fetchall()]
+
+	return render_template("browse.html", items=items)
+
+
+@app.route("/submit_comment", methods=["GET"])
+def submit_comment():
+	cursor = conn.cursor()
+	picture_id = flask.request.args.get("picture_id")
+	text = flask.request.args.get("text")
+	cursor.execute("SET FOREIGN_KEY_CHECKS = 0")
+	if not flask_login.current_user.is_anonymous:
+		uid = getUserIdFromEmail(flask_login.current_user.id)
+		cursor.execute(f"select * from pictures where user_id={uid} and picture_id={picture_id} limit 1")
+		value = cursor.fetchone()
+		print(value)
+		if len(value) != 0:
+			return "You can't leave messages for yourself！"
+	else:
+		uid = -1
+
+	cursor.execute(f'INSERT INTO comments (user_id, words) VALUES({uid}, {text})')
+	cursor.execute('select max(comment_id) from comments')
+	comment_id = cursor.fetchone()[0]
+	cursor.execute(f'INSERT INTO commented_on (comment_id, picture_id) VALUES({comment_id}, {picture_id})')
+
+	cursor.execute("SET FOREIGN_KEY_CHECKS = 1")
+	cursor.close()
+	conn.commit()
+	return redirect(f'/picture/{picture_id}')
+
+@app.route("/like", methods=["GET"])
+@flask_login.login_required
+def like():
+	cursor = conn.cursor()
+	picture_id = flask.request.args.get("picture_id")
+	uid = getUserIdFromEmail(flask_login.current_user.id)
+
+	cursor.execute(f'INSERT INTO liked_pictures (user_id, picture_id) VALUES({uid}, {picture_id})')
+
+	cursor.close()
+	conn.commit()
+	return redirect(f'/picture/{picture_id}')
+
 
 
 #default page
