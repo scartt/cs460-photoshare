@@ -1,0 +1,16 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Browse By Album</title>
+</head>
+<body>
+    <h1>Browse By Albums</h1>
+    <ul>
+        {% for album in albums %}
+            <li><a href="browse/album/{{album.album_id}}">{{album.email}} - {{album.album}}</a></li>
+        {% endfor %}
+    </ul>
+<a href='/'>Home</a>
+</body>
+</html>

@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Browse</title>
+</head>
+<body>
+<!--Album-->
+    <ul>
+        {% for album in albums %}
+            <li>
+                <form action='delete_album' method='GET'>
+                    <span><a href="/browse/album/{{album.album_id}}">{{album.name}}</a></span>
+                    <input hidden type='text' name='name' value={{album.name}}></input>
+                    <input type='submit' name='submit' value="Delete Album"></input>
+                </form>
+            </li>
+        {% endfor %}
+    </ul>
+
+<!--Tag-->
+    <ul>
+        {% for tag in tags %}
+            <li><a href="/browse/tag/{{tag.tag_id}}">{{tag.tag}}</a></li>
+        {% endfor %}
+    </ul>
+
+<!--Picture-->
+    <ul>
+        {% for picture in pictures %}
+            <li>
+                <form action='delete_picture' method='GET'>
+                    <p><a href="/picture/{{picture.picture_id}}">{{picture.caption}}</a></p>
+                    <img src='data:image/jpg;base64, {{ picture.imgdata }}' width="200"/>
+                    <input hidden type='text' name='picture_id' value={{picture.picture_id}}/>
+                    <input type='submit' name='submit' value="Delete Picture"/>
+                </form>
+            </li>
+        {% endfor %}
+    </ul>
+
+<a href='/'>Home</a>
+</body>
+</html>

@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>{{message}}</title>
+</head>
+<body>
+    <h1>{{message}}: </h1>
+
+    <ul>
+    {% for album in albums %}
+        <li>
+            <form action='delete_album' method='GET'>
+                <span>{{album.name}}</span>
+                <input hidden type='text' name='name' value={{album.name}}></input>
+                <input type='submit' name='submit' value="Delete Album"></input>
+            </form>
+            <ul>
+                {% for picture in album.pictures %}
+                    <li>
+                        <form action='delete_picture' method='GET'>
+                            <p><a href="picture/{{picture.picture_id}}">{{picture.caption}}<a></p>
+                            <img src='data:image/jpg;base64, {{ picture.imgdata }}' width="200"/>
+                            <input hidden type='text' name='picture_id' value={{picture.picture_id}}></input>
+                            <input type='submit' name='submit' value="Delete Picture"></input>
+                        </form>
+                    </li>
+                {% endfor %}
+            </ul>
+        </li>
+    {% endfor %}
+    </ul>
+<a href='/'>Home</a>
+</body>
+</html>

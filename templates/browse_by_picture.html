@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Browse</title>
+</head>
+<body>
+    {% if message %}
+      <h1>{{message}}</h1>
+    {% endif %}
+
+    <ul>
+        {% for picture in items %}
+            <li>
+                <p><a href="/picture/{{picture.picture_id}}">{{picture.caption}}</a></p>
+                <img src='data:image/jpg;base64, {{ picture.imgdata }}' width="200"/>
+            </li>
+        {% endfor %}
+    </ul>
+<a href='/'>Home</a>
+</body>
+</html>

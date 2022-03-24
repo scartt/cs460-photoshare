@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Hot</title>
+</head>
+<body>
+
+    <h1>{{message}}</h1>
+        <ol>
+        {% for email in emails %}
+            <li>{{email}}</li>
+        {% endfor %}
+        </ol>
+
+        <ol>
+        {% for tag in tags %}
+            <li><a href="/browse/tag/{{tag.tag_id}}"> {{tag.tag}} </a></li>
+        {% endfor %}
+        </ol>
+
+    <a href='/'>Home</a>
+</body>
+</html>

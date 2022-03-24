@@ -1,0 +1,16 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Browse By Tag</title>
+</head>
+<body>
+    <h1>Browse By Tags</h1>
+    <ul>
+        {% for tag in tags %}
+            <li><a href="browse/tag/{{tag.tag_id}}">{{tag.tag}}</a></li>
+        {% endfor %}
+    </ul>
+<a href='/'>Home</a>
+</body>
+</html>
